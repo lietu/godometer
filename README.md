@@ -20,7 +20,7 @@ Tested on Raspberry Pi 4, should work on most Linux supported GPIO chips.
 
 [Licensed under the BSD 3-clause license](./LICENSE.md).
 
-![Graphs by Godometer](godometer.png 'Godometer dashboard')
+[![Graphs by Godometer](godometer.png 'Godometer dashboard')](https://raw.githubusercontent.com/lietu/godometer/master/godometer.png)
 
 ## Usage
 
