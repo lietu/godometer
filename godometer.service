@@ -1,0 +1,11 @@
+[Unit]
+Description=Godometer monitoring service
+
+[Service]
+Type=simple
+ExecStart=/home/pi/godometer -apiBaseUrl https://your.server -apiAuth your-password -quiet
+WorkingDirectory=/home/pi
+User=pi
+
+[Install]
+WantedBy=multi-user.target

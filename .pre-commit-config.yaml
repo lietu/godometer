@@ -1,0 +1,50 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: |
+          (?x)(
+            ^(.*/)?vendor/.*$|
+            ^.*/__snapshots__/.*$
+          )
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)(
+            ^(.*/)?vendor/.*$|
+            ^.*/__snapshots__/.*$
+          )
+      # All non-bat files should end with LF
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+        exclude: |
+          (?x)(
+            \.bat$|
+            ^.*/__snapshots__/.*$
+          )
+      # Bat files should be CRLF ending
+      - id: mixed-line-ending
+        args: ['--fix=crlf']
+        files: \.bat$
+  - repo: https://github.com/ryanrhee/shellcheck-py
+    rev: master
+    hooks:
+      - id: shellcheck
+        exclude: ^(.*/)?vendor/.*$
+  - repo: https://github.com/lietu/go-pre-commit
+    rev: master
+    hooks:
+      - id: gofumports
+        exclude: ^(.*/)?vendor/.*$
+      - id: gofumpt
+        exclude: ^(.*/)?vendor/.*$
+  # TODO: Has some idiot issues with parsing gpiod
+  #      - id: golangci-lint
+  #        exclude: ^(.*/)?vendor/.*$
+  - repo: https://github.com/prettier/prettier
+    rev: master
+    hooks:
+      - id: prettier
+        exclude: ^(.*/)?vendor/.*$

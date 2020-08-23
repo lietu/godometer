@@ -1,0 +1,6 @@
+node_modules
+*.exe
+cmd/godometer/godometer
+cmd/godoserv/godoserv
+package-lock.json
+.idea
