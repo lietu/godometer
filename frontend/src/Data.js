@@ -255,7 +255,7 @@ export function convertDistance(meters, target) {
     const conversion = distanceConversions[target]
     value = conversion.ratio * meters
   }
-  return parseFloat(value.toFixed(1))
+  return value
 }
 
 export function convertSpeed(data, target) {
@@ -267,6 +267,7 @@ export function convertSpeed(data, target) {
     if (conversion === undefined) {
       throw new Error(`Invalid conversion target ${target}`)
     }
+
     value = conversion.ratio * data[conversion.from]
   }
   return parseFloat(value.toFixed(1))

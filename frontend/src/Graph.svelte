@@ -66,19 +66,41 @@
           type: "linear",
           display: true,
           position: "left",
-          suggestedMin: 0,
-          beginAtZero: true
+          ticks: {
+            min: 0,
+            beginAtZero: true
+          },
         },
         {
           id: "Speed",
           type: "linear",
           display: true,
           position: "right",
-          suggestedMin: 0,
-          beginAtZero: true
+          ticks: {
+            min: 0,
+            beginAtZero: true
+          },
         },
       ]
     }
+  }
+
+  function getDecimals(number) {
+    let decimals = 0
+    number = Math.abs(number)
+    if (number > 0) {
+      while (Math.round(number) === 0) {
+        decimals += 1
+        number *= 10
+      }
+    }
+    return decimals
+  }
+
+  function ceil(value, defaultValue) {
+    const decimals = Math.max(getDecimals(value), getDecimals(defaultValue))
+    const multiplier = Math.pow(10, decimals)
+    return Math.ceil(value * multiplier) / multiplier
   }
 
   function updateChartData() {
@@ -89,15 +111,20 @@
     const labels = []
     const distance = []
     const speed = []
-    let maxDistance = 5
-    let maxSpeed = 3
+    const defaultMaxDistance = convertDistance(25, $distanceUnits)
+    const defaultMaxSpeed = convertSpeed({ mps: 2.75, kph: 9.9 }, $speedUnits)
 
-    const lineColor = periodColor[period]
+    let maxDistance = defaultMaxDistance
+    let maxSpeed = defaultMaxSpeed
+
     const gridColor = $mode === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
+    const lineColor = periodColor[period]
     const fontColor = $mode === "dark" ? "#aaa" : "#333"
 
-    const distanceColor = lineColor.saturate(2).alpha(0.6).css()
-    const speedColor = lineColor.desaturate(2).alpha(0.6).css()
+    const distanceColor = lineColor.saturate(2).alpha(0.6)
+    const speedColor = lineColor.desaturate(2).alpha(0.6)
+    const distanceGridColor = distanceColor.alpha(0.15)
+    const speedGridColor = speedColor.alpha(0.15)
 
     chartOptions.title.fontColor = fontColor
     chartOptions.legend.labels.fontColor = fontColor
@@ -133,38 +160,49 @@
         datasets: [
           {
             label: `Distance (${$distanceUnits})`,
-            yAxisId: "Distance",
-            borderColor: distanceColor,
-            backgroundColor: distanceColor,
+            yAxisID: "Distance",
+            borderColor: distanceColor.css(),
+            backgroundColor: distanceColor.css(),
             fill: false,
             data: distance,
           },
           {
             label: `Speed (${speedDisplayUnits[$speedUnits]})`,
-            xAxisId: "x",
-            yAxisId: "Speed",
-            borderColor: speedColor,
-            backgroundColor: speedColor,
+            xAxisID: "x",
+            yAxisID: "Speed",
+            borderColor: speedColor.css(),
+            backgroundColor: speedColor.css(),
             fill: false,
             data: speed,
           }
         ],
       }
 
-      chartOptions.scales.xAxes[0].ticks = ticks
-      chartOptions.scales.yAxes[0].ticks = ticks
-      chartOptions.scales.yAxes[1].ticks = ticks
+      // Ensure scales seem rounded
+      if (maxDistance !== defaultMaxDistance) {
+        maxDistance = ceil(maxDistance, defaultMaxDistance)
+      }
+      if (maxSpeed !== defaultMaxSpeed) {
+        maxSpeed = ceil(maxDistance, defaultMaxDistance)
+      }
 
-      chartOptions.scales.xAxes[0].gridLines = gridLines
-      chartOptions.scales.yAxes[0].gridLines = gridLines
-      chartOptions.scales.yAxes[1].gridLines = gridLines
+      // Set up X axis styles
+      chartOptions.scales.xAxes[0].ticks = Object.assign({}, ticks)
+      chartOptions.scales.xAxes[0].gridLines = Object.assign({}, gridLines)
 
-      chartOptions.scales.yAxes[0].suggestedMax = maxDistance
-      chartOptions.scales.yAxes[1].suggestedMax = maxSpeed
+      // And both Y axises
+      // Distance
+      chartOptions.scales.yAxes[0].ticks = Object.assign({}, ticks)
+      chartOptions.scales.yAxes[0].ticks.max = maxDistance
+      chartOptions.scales.yAxes[0].gridLines = {
+        color: distanceGridColor.css()
+      }
 
-      if (period === "minutes") {
-        chartData.datasets[0].pointRadius = 1.5
-        chartData.datasets[1].pointRadius = 1.5
+      // Speed
+      chartOptions.scales.yAxes[1].ticks = Object.assign({}, ticks)
+      chartOptions.scales.yAxes[1].ticks.max = maxSpeed
+      chartOptions.scales.yAxes[1].gridLines = {
+        color: speedGridColor.css()
       }
 
       if (chart === undefined) {

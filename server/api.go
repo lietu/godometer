@@ -5,20 +5,25 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"path/filepath"
 	"time"
 
-	"github.com/gin-contrib/pprof"
-
 	"github.com/gin-contrib/gzip"
+	"github.com/gin-contrib/pprof"
 	ginzap "github.com/gin-contrib/zap"
+	"go.uber.org/zap"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lietu/godometer"
-	"go.uber.org/zap"
 )
 
 const frontend = "../../frontend/public"
+
+var prevFakeMeters = 0.0
+
+const maxFakeMeters = 175.0
 
 // YYYY-MM-DD HH:MM - we mostly want per minute precision
 const (
@@ -73,6 +78,7 @@ type Server struct {
 	weeks      map[string]DBDataPoint
 	months     map[string]DBDataPoint
 	years      map[string]DBDataPoint
+	engine     *gin.Engine
 }
 
 func weekFormat(ts time.Time) string {
@@ -183,7 +189,81 @@ func (s *Server) returnRecords(period string) gin.HandlerFunc {
 	}
 }
 
-func NewServer(dev bool, projectId string, apiAuth string) *gin.Engine {
+func fakeDataPoint() DBDataPoint {
+	metersChange := rand.Float64() * 50.0
+	if prevFakeMeters-metersChange > 0 && prevFakeMeters+metersChange < maxFakeMeters {
+		dir := rand.Int31n(1) == 1
+		if !dir {
+			metersChange = -metersChange
+		}
+	} else if prevFakeMeters+metersChange > maxFakeMeters {
+		metersChange = -metersChange
+	}
+
+	meters := prevFakeMeters + metersChange
+
+	mps := float32(meters / 60.0)
+	kph := mps * 3600.0 / 1000.0
+
+	prevFakeMeters = meters
+
+	return DBDataPoint{
+		Meters:            float32(meters),
+		MetersPerSecond:   mps,
+		KilometersPerHour: kph,
+	}
+}
+
+func (s *Server) fillFakeDataRecords(records map[string]DBDataPoint) {
+	for key := range records {
+		records[key] = fakeDataPoint()
+	}
+}
+
+func (s *Server) generateFakeData() {
+	// Initialize all data structures
+	s.fillFakeDataRecords(s.years)
+	s.fillFakeDataRecords(s.months)
+	s.fillFakeDataRecords(s.weeks)
+	s.fillFakeDataRecords(s.days)
+	s.fillFakeDataRecords(s.hours)
+	s.fillFakeDataRecords(s.minutes)
+
+	log.Printf("Filled records with fake data")
+
+	tick := time.Tick(time.Minute)
+	ctx := context.Background()
+	for {
+		select {
+		case <-tick:
+			dp := fakeDataPoint()
+			udp := []godometer.UpdateDataPoint{
+				{
+					Timestamp:         time.Now().In(utc).Format(minuteLayout),
+					Meters:            dp.Meters,
+					MetersPerSecond:   dp.MetersPerSecond,
+					KilometersPerHour: dp.KilometersPerHour,
+				},
+			}
+
+			log.Printf("FAKED: %.1f m @ %.1f m/s or %1.f km/h", udp[0].Meters, udp[0].MetersPerSecond, udp[0].KilometersPerHour)
+			s.writeStats(ctx, udp)
+		}
+	}
+}
+
+func (s *Server) Run(listenAddr string, fakeData bool) {
+	if fakeData {
+		go s.generateFakeData()
+	}
+
+	err := s.engine.Run(listenAddr)
+	if err != nil {
+		log.Panic("Failed to run server: %s", err)
+	}
+}
+
+func NewServer(dev bool, projectId string, apiAuth string) *Server {
 	logger, err := zap.NewProduction()
 	if err != nil {
 		log.Panicf("Failed to create logger: %s", err)
@@ -203,7 +283,7 @@ func NewServer(dev bool, projectId string, apiAuth string) *gin.Engine {
 	// It's kind of important to have gzip enabled.
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
-	srv := Server{}
+	srv := &Server{}
 	srv.projectId = projectId
 	srv.loadData()
 
@@ -238,5 +318,6 @@ func NewServer(dev bool, projectId string, apiAuth string) *gin.Engine {
 		}
 	}
 
-	return router
+	srv.engine = router
+	return srv
 }

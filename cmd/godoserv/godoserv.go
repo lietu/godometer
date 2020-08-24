@@ -14,6 +14,7 @@ import (
 const fakeProjectId = "some-fake-project-id"
 
 var (
+	fakeData  = flag.Bool("fakeData", false, "Generate fake data, for testing frontend. Optionally use the FAKE_DATA environment variable.")
 	dev       = flag.Bool("dev", false, "Development mode (allow insecure traffic). Optionally use the DEV environment variable.")
 	host      = flag.String("host", "0.0.0.0", "Which TCP address to listen on, 0.0.0.0 for all. Optionally use the HOST environment variable.")
 	port      = flag.Int("port", 8080, "Which TCP port to listen to. Optionally use the PORT environment variable.")
@@ -23,6 +24,7 @@ var (
 
 type Config struct {
 	dev        bool
+	fakeData   bool
 	host       string
 	projectId  string
 	port       int
@@ -43,6 +45,7 @@ func parseConfig() Config {
 	flag.Parse()
 
 	c := Config{
+		fakeData:   *fakeData,
 		dev:        *dev,
 		host:       *host,
 		projectId:  *projectId,
@@ -52,6 +55,14 @@ func parseConfig() Config {
 	}
 
 	if e := os.Getenv("DEV"); e != "" {
+		if e == "1" || e == "yes" || e == "true" {
+			c.dev = true
+		} else {
+			c.dev = false
+		}
+	}
+
+	if e := os.Getenv("FAKE_DATA"); e != "" {
 		if e == "1" || e == "yes" || e == "true" {
 			c.dev = true
 		} else {
@@ -124,9 +135,6 @@ func main() {
 		}
 	}
 
-	engine := server.NewServer(config.dev, config.projectId, config.apiAuth)
-	err := engine.Run(fmt.Sprintf("%s:%d", config.host, config.port))
-	if err != nil {
-		log.Panic("Failed to run server: %s", err)
-	}
+	srv := server.NewServer(config.dev, config.projectId, config.apiAuth)
+	srv.Run(fmt.Sprintf("%s:%d", config.host, config.port), config.fakeData)
 }

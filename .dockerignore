@@ -1,3 +1,4 @@
 .idea
 frontend/node_modules
 cmd/godoserv/godoserv.exe
+cmd/godoserv/go_build_godoserv_go.exe

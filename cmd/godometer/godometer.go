@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	dev                = flag.Bool("dev", false, "Development mode, enables profiler in port 8888")
+	dev                = flag.Bool("dev", false, "Development mode, enables profiler in port 8888. Optionally use the DEV environment variable.")
 	device             = flag.String("device", "gpiochip0", "The /dev device name for GPIO to monitor. Optionally use the DEVICE environment variable.")
 	pin                = flag.Int("pin", rpi.J8p11, "Which GPIO PIN to monitor. Optionally use the PIN environment variable.")
 	wheelCircumference = flag.Float64("circumference", 0.2375, "Measurement wheel circumference in meters. Optionally use the WHEEL_CIRCUMFERENCE environment variable.")

@@ -132,11 +132,11 @@
     padding: 0;
     overflow: hidden;
     overflow-y: hidden !important;
+  }
 
-    &.dark {
-      background: #090909;
-      color: #fff;
-    }
+  :global(body.dark) {
+    background: #090909;
+    color: #fff;
   }
 
   h1 {
