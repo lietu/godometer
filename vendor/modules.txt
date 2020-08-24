@@ -13,6 +13,9 @@ cloud.google.com/go/firestore/apiv1
 # github.com/gin-contrib/gzip v0.0.2
 ## explicit
 github.com/gin-contrib/gzip
+# github.com/gin-contrib/pprof v1.3.0
+## explicit
+github.com/gin-contrib/pprof
 # github.com/gin-contrib/sse v0.1.0
 github.com/gin-contrib/sse
 # github.com/gin-contrib/zap v0.0.1

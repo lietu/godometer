@@ -1,6 +1,7 @@
 node_modules
-*.exe
 cmd/godometer/godometer
 cmd/godoserv/godoserv
+cmd/godoserv/godoserv.exe
 package-lock.json
 .idea
+*.exe

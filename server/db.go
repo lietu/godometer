@@ -522,13 +522,19 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 	s.clearOldStats()
 }
 
+var firestoreClient *firestore.Client
+
 func GetClient(ctx context.Context, projectId string) *firestore.Client {
-	c, err := firestore.NewClient(ctx, projectId)
-	if err != nil {
-		log.Panicf("Failed to connect to DB: %s", err)
+	if firestoreClient == nil {
+		c, err := firestore.NewClient(ctx, projectId)
+		if err != nil {
+			log.Panicf("Failed to connect to DB: %s", err)
+		}
+
+		firestoreClient = c
 	}
 
-	return c
+	return firestoreClient
 }
 
 func Last60Minutes() [60]string {

@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"time"
@@ -12,6 +14,7 @@ import (
 )
 
 var (
+	dev                = flag.Bool("dev", false, "Development mode, enables profiler in port 8888")
 	device             = flag.String("device", "gpiochip0", "The /dev device name for GPIO to monitor. Optionally use the DEVICE environment variable.")
 	pin                = flag.Int("pin", rpi.J8p11, "Which GPIO PIN to monitor. Optionally use the PIN environment variable.")
 	wheelCircumference = flag.Float64("circumference", 0.2375, "Measurement wheel circumference in meters. Optionally use the WHEEL_CIRCUMFERENCE environment variable.")
@@ -22,6 +25,7 @@ var (
 )
 
 type Config struct {
+	dev                bool
 	device             string
 	pin                int
 	wheelCircumference float64
@@ -35,6 +39,7 @@ func parseConfig() Config {
 	flag.Parse()
 
 	c := Config{
+		dev:                *dev,
 		device:             *device,
 		pin:                *pin,
 		wheelCircumference: *wheelCircumference,
@@ -86,6 +91,14 @@ func parseConfig() Config {
 		}
 	}
 
+	if e := os.Getenv("dev"); e != "" {
+		if e == "1" || e == "yes" || e == "true" {
+			c.dev = true
+		} else {
+			c.dev = false
+		}
+	}
+
 	return c
 }
 
@@ -119,6 +132,12 @@ func main() {
 
 	go gm.Monitor(exit)
 	go sm.Monitor(config.quiet, exit2)
+
+	if config.dev {
+		go func() {
+			log.Println(http.ListenAndServe("0.0.0.0:8888", nil))
+		}()
+	}
 
 	defer func() { exit <- true }()
 	defer func() { exit2 <- true }()

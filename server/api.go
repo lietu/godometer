@@ -9,12 +9,16 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gin-contrib/pprof"
+
 	"github.com/gin-contrib/gzip"
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/lietu/godometer"
 	"go.uber.org/zap"
 )
+
+const frontend = "../../frontend/public"
 
 // YYYY-MM-DD HH:MM - we mostly want per minute precision
 const (
@@ -179,8 +183,6 @@ func (s *Server) returnRecords(period string) gin.HandlerFunc {
 	}
 }
 
-const frontend = "../../frontend/public"
-
 func NewServer(dev bool, projectId string, apiAuth string) *gin.Engine {
 	logger, err := zap.NewProduction()
 	if err != nil {
@@ -190,13 +192,13 @@ func NewServer(dev bool, projectId string, apiAuth string) *gin.Engine {
 	var router *gin.Engine
 	if dev {
 		router = gin.Default()
+		pprof.Register(router)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 		router = gin.New()
 		router.Use(ginzap.Ginzap(logger, time.RFC3339, true))
 		router.Use(ginzap.RecoveryWithZap(logger, true))
 	}
-
 	router.Use(SecurityMiddleware(dev))
 	// It's kind of important to have gzip enabled.
 	router.Use(gzip.Gzip(gzip.DefaultCompression))

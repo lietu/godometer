@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go v0.64.0
 	cloud.google.com/go/firestore v1.3.0
 	github.com/gin-contrib/gzip v0.0.2
+	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-contrib/zap v0.0.1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/unrolled/secure v1.0.8
