@@ -47,10 +47,17 @@
     window.history.pushState({}, '', location.toString())
   }
 
+  function updateMode() {
+    document.body.classList.remove("light", "dark")
+    document.body.classList.add($mode)
+  }
+
   function toggleMode() {
     $mode = $mode === "dark" ? "light" : "dark"
     location.searchParams.set("mode", $mode)
     window.history.pushState({}, '', location.toString())
+
+    updateMode()
   }
 
   const speedUnitKeys = Object.keys(speedDisplayUnits)
@@ -61,8 +68,7 @@
     mode,
   }
 
-  document.body.classList.remove("light", "dark")
-  document.body.classList.add($mode)
+  updateMode()
 </script>
 
 <div class="flex-container">
