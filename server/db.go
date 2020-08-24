@@ -455,7 +455,7 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 
 	eventsColl := db.Collection(collectionName("events"))
 	yearsColl := db.Collection(collectionName("years"))
-	monthsColl := db.Collection(collectionName("years"))
+	monthsColl := db.Collection(collectionName("months"))
 	weeksColl := db.Collection(collectionName("weeks"))
 	daysColl := db.Collection(collectionName("days"))
 	hoursColl := db.Collection(collectionName("hours"))
