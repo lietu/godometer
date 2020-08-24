@@ -258,6 +258,30 @@ export function convertDistance(meters, target) {
   return value
 }
 
+function getDecimals(number) {
+  let decimals = 0
+  number = Math.abs(number)
+  if (number > 0) {
+    while (Math.round(number) === 0) {
+      decimals += 1
+      number *= 10
+    }
+  }
+  return decimals
+}
+
+export function ceilDefault(value, defaultValue) {
+  const decimals = Math.max(getDecimals(value), getDecimals(defaultValue))
+  const multiplier = Math.pow(10, decimals)
+  return Math.ceil(value * multiplier) / multiplier
+}
+
+export function round1(value) {
+  const decimals = getDecimals(value) + 1
+  const multiplier = Math.pow(10, decimals)
+  return Math.round(value * multiplier) / multiplier
+}
+
 export function convertSpeed(data, target) {
   let value = data.mps
   if (target === 'kph') {

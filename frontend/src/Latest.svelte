@@ -1,5 +1,5 @@
 <script>
-  import { convertSpeed, convertDistance, speedDisplayUnits } from "./Data"
+  import { convertSpeed, convertDistance, speedDisplayUnits, round1 } from "./Data"
 
   export let mode
   export let distanceUnits
@@ -36,10 +36,10 @@
 </script>
 
 <div class={"latest-data " + mode}>
-  <h2 class="left now">Latest: {nowDistance} {$distanceUnits}
-    @ {nowSpeed} {speedDisplay}</h2>
-  <h2 class="right">Previous: {earlierDistance} {$distanceUnits}
-    @ {earlierSpeed} {speedDisplay}</h2>
+  <h2 class="left now">Latest: {round1(nowDistance)} {$distanceUnits}
+    @ {round1(nowSpeed)} {speedDisplay}</h2>
+  <h2 class="right">Previous: {round1(earlierDistance)} {$distanceUnits}
+    @ {round1(earlierSpeed)} {speedDisplay}</h2>
 </div>
 
 <style type="scss">

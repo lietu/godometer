@@ -7,6 +7,7 @@
     convertSpeed,
     convertDistance,
     convertLabel,
+    ceilDefault,
     speedDisplayUnits
   } from "./Data"
 
@@ -83,24 +84,6 @@
         },
       ]
     }
-  }
-
-  function getDecimals(number) {
-    let decimals = 0
-    number = Math.abs(number)
-    if (number > 0) {
-      while (Math.round(number) === 0) {
-        decimals += 1
-        number *= 10
-      }
-    }
-    return decimals
-  }
-
-  function ceil(value, defaultValue) {
-    const decimals = Math.max(getDecimals(value), getDecimals(defaultValue))
-    const multiplier = Math.pow(10, decimals)
-    return Math.ceil(value * multiplier) / multiplier
   }
 
   function updateChartData() {
@@ -180,10 +163,10 @@
 
       // Ensure scales seem rounded
       if (maxDistance !== defaultMaxDistance) {
-        maxDistance = ceil(maxDistance, defaultMaxDistance)
+        maxDistance = ceilDefault(maxDistance, defaultMaxDistance)
       }
       if (maxSpeed !== defaultMaxSpeed) {
-        maxSpeed = ceil(maxDistance, defaultMaxDistance)
+        maxSpeed = ceilDefault(maxDistance, defaultMaxDistance)
       }
 
       // Set up X axis styles
