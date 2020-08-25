@@ -7,6 +7,7 @@ const keepEvents = 15
 const periods = ['minutes', 'hours', 'days', 'weeks', 'months', 'years']
 const loadedPeriods = []
 const neededPeriods = periods.length
+let isFirstUpdate = true
 
 const periodEvents = {
   minutes: [],
@@ -110,47 +111,72 @@ function tsToPeriodTs(ts, period) {
   throw new Error(`Invalid timestamp period ${period}`)
 }
 
-function updatePeriodEvent(period, event) {
-  // Save this event as processed
-  const periodTs = tsToPeriodTs(event.ts, period)
-  const processed = periodEvents[period].indexOf(periodTs) !== -1
+function updateDataPoint(oldDp, newDp, period) {
+  // Existing minute data should be considered a refresh, not an increment
+  if (period === 'minutes') {
+    oldDp.m = newDp.m
+    oldDp.mps = newDp.mps
+    oldDp.kph = newDp.kph
+    return
+  }
 
-  if (!processed) {
-    periodEvents[period].push(periodTs)
+  // Calculate totals
+  const totalC = oldDp.c + newDp.c
+  const totalMPS = oldDp.c * oldDp.mps + newDp.mps
+  const totalKPH = oldDp.c * oldDp.kph + newDp.kph
+
+  // And calculate merged data
+  oldDp.m += newDp.m
+  oldDp.c = totalC
+  oldDp.mps = totalMPS / totalC
+  oldDp.kph = totalKPH / totalC
+}
+
+function updatePeriodEvent(period, event) {
+  // Figure out if events for this minute have already been processed, or if it is the most recent update
+  const minuteTs = tsToPeriodTs(event.ts, 'minutes')
+  const eventIndex = periodEvents[period].indexOf(minuteTs)
+
+  const isProcessed = eventIndex !== -1
+  const isLatest =
+    periodEvents[period].length === 0
+      ? false
+      : eventIndex === periodEvents[period].length - 1
+
+  if (!isProcessed) {
+    // Save this minute as processed
+    periodEvents[period].push(minuteTs)
     periodEvents[period] = periodEvents[period].splice(-keepEvents)
   }
 
-  // Don't reprocess events except where it kinda may sometimes matter
-  if (processed && period !== 'minutes') {
+  // Don't process events that could cause problems
+  if (isFirstUpdate) {
     return
   }
 
+  if (isProcessed && (!isLatest || period !== 'minutes')) {
+    return
+  }
+
+  const periodTs = tsToPeriodTs(event.ts, period)
   const dataPoints = periodDataPoints[period]
-  if (dataPoints === undefined || dataPoints.length === 0) {
-    return
+  if (!dataPoints) {
+    throw new Error(`Could not find any ${period} data points?`)
   }
-
-  let found = false
-  dataPoints.forEach((dp) => {
-    if (dp.ts === periodTs) {
-      if (period === 'minutes') {
-        dp.m = event.m
-      } else {
-        dp.m += event.m
-      }
-      found = true
-    }
-  })
+  const existingDataPoint = dataPoints.find((dp) => dp.ts === periodTs)
 
   // Not in the list yet, new data
-  if (!found) {
+  if (!existingDataPoint) {
     dataPoints.push({
+      c: event.c,
       ts: periodTs,
       m: event.m,
       mps: event.mps,
       kph: event.kph,
     })
     dataPoints.shift()
+  } else {
+    updateDataPoint(existingDataPoint, event, period)
   }
 
   periodStores[period].set(dataPoints)
@@ -168,11 +194,12 @@ async function pollEvents() {
   ) {
     const body = await response.json()
     const events = body.events
-    events.forEach((event) => {
-      periods.forEach((period) => {
+    periods.forEach((period) => {
+      events.forEach((event) => {
         updatePeriodEvent(period, event)
       })
     })
+    isFirstUpdate = false
   }
 }
 
@@ -187,7 +214,15 @@ async function readStats(period) {
     response.headers.get('Content-Type').startsWith('application/json')
   ) {
     const data = await response.json()
-    periodEvents[period] = data.eventTimestamps.splice(-keepEvents)
+
+    // We want to store processed events from minute data only! Others lack precision.
+    if (period === 'minutes') {
+      for (let key in periodEvents) {
+        const eventList = Array.from(data.eventTimestamps).splice(-keepEvents)
+        periodEvents[period] = eventList
+      }
+    }
+
     periodStores[period].set(data.dataPoints)
 
     if (loadedPeriods.indexOf(period) === -1) {
