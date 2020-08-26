@@ -14,7 +14,7 @@ import (
 	"github.com/lietu/godometer"
 )
 
-const debugDb = true
+const debugDb = false
 
 var utc, _ = time.LoadLocation("UTC")
 
@@ -369,8 +369,9 @@ func (s *Server) clearOldStats() {
 	}
 }
 
-func calculateUpdate(old DBDataPoint, ok bool, newRow DBDataPoint) DBDataPoint {
+func calculateUpdate(old DBDataPoint, ok bool, newRow DBDataPoint) (DBDataPoint, bool) {
 	result := newRow
+	save := false
 
 	if ok {
 		totalMPS := (old.MetersPerSecond * float32(old.Counter)) + newRow.MetersPerSecond
@@ -380,6 +381,7 @@ func calculateUpdate(old DBDataPoint, ok bool, newRow DBDataPoint) DBDataPoint {
 		// Only count updates with actual data in them
 		if newRow.Meters > 0 && newRow.MetersPerSecond > 0 && newRow.KilometersPerHour > 0 {
 			result.Counter = old.Counter + 1
+			save = true
 		}
 
 		result.Meters = old.Meters + newRow.Meters
@@ -391,9 +393,11 @@ func calculateUpdate(old DBDataPoint, ok bool, newRow DBDataPoint) DBDataPoint {
 			result.MetersPerSecond = 0
 			result.KilometersPerHour = 0
 		}
+	} else {
+		save = true
 	}
 
-	return result
+	return result, save
 }
 
 func (s *Server) isKnownEvent(dataPoint godometer.UpdateDataPoint) bool {
@@ -454,36 +458,46 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 		hour := ts.Format(hourLayout)
 		minute := ts.Format(minuteLayout)
 
-		if !stringInList(years, year) {
+		yearRow, yearsOk := s.years[year]
+		monthRow, monthsOk := s.months[month]
+		weekRow, weeksOk := s.weeks[week]
+		dayRow, daysOk := s.days[day]
+		hourRow, hoursOk := s.hours[hour]
+		_, minutesOk := s.minutes[minute]
+
+		yearRow, saveYear := calculateUpdate(yearRow, yearsOk, currentDataPoint)
+		monthRow, saveMonth := calculateUpdate(monthRow, monthsOk, currentDataPoint)
+		weekRow, saveWeek := calculateUpdate(weekRow, weeksOk, currentDataPoint)
+		dayRow, saveDay := calculateUpdate(dayRow, daysOk, currentDataPoint)
+		hourRow, saveHour := calculateUpdate(hourRow, hoursOk, currentDataPoint)
+		saveMinute := false
+		if currentDataPoint.Meters > 0 || currentDataPoint.MetersPerSecond > 0 || currentDataPoint.KilometersPerHour > 0 || minutesOk {
+			saveMinute = true
+		}
+
+		if saveYear && !stringInList(years, year) {
 			years = append(years, year)
 		}
-		if !stringInList(months, month) {
+
+		if saveMonth && !stringInList(months, month) {
 			months = append(months, month)
 		}
-		if !stringInList(weeks, week) {
+
+		if saveWeek && !stringInList(weeks, week) {
 			weeks = append(weeks, week)
 		}
-		if !stringInList(days, day) {
+
+		if saveDay && !stringInList(days, day) {
 			days = append(days, day)
 		}
-		if !stringInList(hours, hour) {
+
+		if saveHour && !stringInList(hours, hour) {
 			hours = append(hours, hour)
 		}
-		if !stringInList(minutes, minute) {
+
+		if saveMinute && !stringInList(minutes, minute) {
 			minutes = append(minutes, minute)
 		}
-
-		yearRow, ok := s.years[year]
-		monthRow, ok := s.months[month]
-		weekRow, ok := s.weeks[week]
-		dayRow, ok := s.days[day]
-		hourRow, ok := s.hours[hour]
-
-		yearRow = calculateUpdate(yearRow, ok, currentDataPoint)
-		monthRow = calculateUpdate(monthRow, ok, currentDataPoint)
-		weekRow = calculateUpdate(weekRow, ok, currentDataPoint)
-		dayRow = calculateUpdate(dayRow, ok, currentDataPoint)
-		hourRow = calculateUpdate(hourRow, ok, currentDataPoint)
 
 		s.years[year] = yearRow
 		s.months[month] = monthRow

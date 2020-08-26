@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -202,6 +203,20 @@ func (s *Server) returnRecords(period string) gin.HandlerFunc {
 					KilometersPerHour: 0.0,
 				}
 			}
+
+			// Clean up in case broken data ends up in DB
+			if math.IsNaN(float64(event.Meters)) {
+				event.Meters = 0
+			}
+
+			if math.IsNaN(float64(event.MetersPerSecond)) {
+				event.MetersPerSecond = 0
+			}
+
+			if math.IsNaN(float64(event.KilometersPerHour)) {
+				event.KilometersPerHour = 0
+			}
+
 			events = append(events, event)
 		}
 
