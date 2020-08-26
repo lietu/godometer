@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/lietu/godometer"
 )
 
-const debugDb = false
+const debugDb = true
 
 var utc, _ = time.LoadLocation("UTC")
 
@@ -21,6 +22,10 @@ type LastEventContainer struct {
 
 func collectionName(period string) string {
 	return fmt.Sprintf("godometer-%s-records", period)
+}
+
+func recordStr(record DBDataPoint) string {
+	return fmt.Sprintf("%.2fm @ %.1fm/s or %.1fkm/h", record.Meters, record.MetersPerSecond, record.KilometersPerHour)
 }
 
 func printRecords(records map[string]DBDataPoint) {
@@ -33,8 +38,23 @@ func printRecords(records map[string]DBDataPoint) {
 
 	for _, key := range keys {
 		row := records[key]
-		log.Printf("%s: %.2fm @ %.1fm/s or %.1fkm/h", key, row.Meters, row.MetersPerSecond, row.KilometersPerHour)
+		log.Printf("%s: %s", key, recordStr(row))
 	}
+}
+
+func latestKey(records map[string]DBDataPoint) string {
+	var keys []string
+	for key := range records {
+		keys = append(keys, key)
+	}
+
+	if len(keys) == 0 {
+		return ""
+	}
+
+	sort.Strings(keys)
+
+	return keys[len(keys)-1]
 }
 
 func (s *Server) printAllRecords() {
@@ -51,6 +71,16 @@ func (s *Server) printAllRecords() {
 	printRecords(s.months)
 	log.Print(" ----- YEAR RECORDS -----")
 	printRecords(s.years)
+}
+
+func (s *Server) printLatestRecords() {
+	log.Printf("----- LATEST RECORDS -----")
+	log.Printf("Latest minute: %s", recordStr(s.minutes[latestKey(s.minutes)]))
+	log.Printf("Latest hour:   %s", recordStr(s.hours[latestKey(s.hours)]))
+	log.Printf("Latest day:    %s", recordStr(s.days[latestKey(s.days)]))
+	log.Printf("Latest week:   %s", recordStr(s.weeks[latestKey(s.weeks)]))
+	log.Printf("Latest month:  %s", recordStr(s.months[latestKey(s.months)]))
+	log.Printf("Latest year:   %s", recordStr(s.years[latestKey(s.years)]))
 }
 
 func (s *Server) loadData() {
@@ -147,9 +177,11 @@ func (s *Server) readEvents(ctx context.Context) {
 
 	s.lastEvents = eventContainer.Events
 
-	log.Printf("Recent events")
-	for _, e := range s.lastEvents {
-		log.Printf("%s: %.1fm @ %.1fm/s or %.1fkm/h", e.Timestamp, e.Meters, e.MetersPerSecond, e.KilometersPerHour)
+	if debugDb {
+		log.Printf("Recent events")
+		for _, e := range s.lastEvents {
+			log.Printf("%s: %.1fm @ %.1fm/s or %.1fkm/h", e.Timestamp, e.Meters, e.MetersPerSecond, e.KilometersPerHour)
+		}
 	}
 }
 
@@ -378,6 +410,7 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 	var days []string
 	var hours []string
 	var minutes []string
+	var newEvents []string
 
 	newDataPoints := 0
 	for _, udp := range updateDataPoints {
@@ -446,6 +479,7 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 
 		s.lastEvents = append(s.lastEvents, currentDataPoint.toResponseDataPoint(udp.Timestamp))
 		newDataPoints += 1
+		newEvents = append(newEvents, udp.Timestamp)
 	}
 
 	s.cleanLastEvents()
@@ -508,9 +542,15 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 	}
 
 	if batchRecords > 0 {
-		if debugDb {
-			log.Printf("Saving %d records to DB", batchRecords)
-		}
+		var keys []string
+		keys = append(keys, years...)
+		keys = append(keys, months...)
+		keys = append(keys, weeks...)
+		keys = append(keys, days...)
+		keys = append(keys, hours...)
+		keys = append(keys, minutes...)
+		log.Printf("Processed events from %s", strings.Join(newEvents, ", "))
+		log.Printf("Saving %d records to DB: %s", batchRecords, strings.Join(keys, ", "))
 		_, err := batch.Commit(ctx)
 		if err != nil {
 			log.Printf("Error trying to save records to DB: %s", err)
@@ -520,6 +560,10 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 	}
 
 	s.clearOldStats()
+
+	if debugDb {
+		s.printLatestRecords()
+	}
 }
 
 var firestoreClient *firestore.Client

@@ -64,9 +64,9 @@ func parseConfig() Config {
 
 	if e := os.Getenv("FAKE_DATA"); e != "" {
 		if e == "1" || e == "yes" || e == "true" {
-			c.dev = true
+			c.fakeData = true
 		} else {
-			c.dev = false
+			c.fakeData = false
 		}
 	}
 

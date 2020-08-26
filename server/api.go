@@ -208,6 +208,7 @@ func fakeDataPoint() DBDataPoint {
 	prevFakeMeters = meters
 
 	return DBDataPoint{
+		Counter:           1,
 		Meters:            float32(meters),
 		MetersPerSecond:   mps,
 		KilometersPerHour: kph,
