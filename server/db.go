@@ -381,9 +381,16 @@ func calculateUpdate(old DBDataPoint, ok bool, newRow DBDataPoint) DBDataPoint {
 		if newRow.Meters > 0 && newRow.MetersPerSecond > 0 && newRow.KilometersPerHour > 0 {
 			result.Counter = old.Counter + 1
 		}
+
 		result.Meters = old.Meters + newRow.Meters
-		result.MetersPerSecond = totalMPS / float32(result.Counter)
-		result.KilometersPerHour = totalKPH / float32(result.Counter)
+
+		if result.Counter > 0 {
+			result.MetersPerSecond = totalMPS / float32(result.Counter)
+			result.KilometersPerHour = totalKPH / float32(result.Counter)
+		} else {
+			result.MetersPerSecond = 0
+			result.KilometersPerHour = 0
+		}
 	}
 
 	return result
