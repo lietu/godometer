@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
+	stackdriver "github.com/tommy351/zap-stackdriver"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/pprof"
 	ginzap "github.com/gin-contrib/zap"
@@ -24,6 +27,8 @@ const frontend = "../../frontend/public"
 var prevFakeMeters = 0.0
 
 const maxFakeMeters = 175.0
+
+var logger = getLogger()
 
 // YYYY-MM-DD HH:MM - we mostly want per minute precision
 const (
@@ -81,6 +86,32 @@ type Server struct {
 	engine     *gin.Engine
 }
 
+func getLogger() *zap.Logger {
+	config := &zap.Config{
+		Level:            zap.NewAtomicLevelAt(zapcore.DebugLevel),
+		Encoding:         "json",
+		EncoderConfig:    stackdriver.EncoderConfig,
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+
+	zapLogger, err := config.Build(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		return &stackdriver.Core{
+			Core: core,
+		}
+	}), zap.Fields(
+		stackdriver.LogServiceContext(&stackdriver.ServiceContext{
+			Service: "foo",
+			Version: "bar",
+		}),
+	))
+	if err != nil {
+		log.Panicf("Failed to create logger: %s", err)
+	}
+
+	return zapLogger
+}
+
 func weekFormat(ts time.Time) string {
 	year, week := ts.ISOWeek()
 	return fmt.Sprintf("%d week %d", year, week)
@@ -90,7 +121,7 @@ func (s *Server) updateStats(c *gin.Context) {
 	req := &godometer.UpdateStatsRequest{}
 	err := c.BindJSON(req)
 	if err != nil {
-		log.Printf("Failed to parse request: %s", err)
+		logger.Warn("Failed to parse request", zap.Error(err))
 		_ = c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
@@ -119,7 +150,7 @@ func getPeriodIds(period string) []string {
 		ids := Last60Minutes()
 		return ids[:]
 	}
-	log.Printf("Invalid period %s", period)
+	logger.Warn("Invalid period", zap.String("period", period))
 	return []string{}
 }
 
@@ -145,7 +176,7 @@ func (s *Server) returnRecords(period string) gin.HandlerFunc {
 		} else if period == "minutes" {
 			availableDataPoints = s.minutes
 		} else {
-			log.Printf("Invalid period %s", period)
+			logger.Warn("Invalid period", zap.String("period", period))
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
@@ -230,7 +261,7 @@ func (s *Server) generateFakeData() {
 	s.fillFakeDataRecords(s.hours)
 	s.fillFakeDataRecords(s.minutes)
 
-	log.Printf("Filled records with fake data")
+	logger.Info("Filled records with fake data")
 
 	tick := time.Tick(time.Minute)
 	ctx := context.Background()
@@ -247,7 +278,7 @@ func (s *Server) generateFakeData() {
 				},
 			}
 
-			log.Printf("FAKED: %.1f m @ %.1f m/s or %1.f km/h", udp[0].Meters, udp[0].MetersPerSecond, udp[0].KilometersPerHour)
+			logger.Info("FAKED EVENT", zap.Float32("meters", udp[0].Meters), zap.Float32("MPS", udp[0].MetersPerSecond), zap.Float32("KPH", udp[0].KilometersPerHour))
 			s.writeStats(ctx, udp)
 		}
 	}
@@ -265,14 +296,11 @@ func (s *Server) Run(listenAddr string, fakeData bool) {
 }
 
 func NewServer(dev bool, projectId string, apiAuth string) *Server {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Panicf("Failed to create logger: %s", err)
-	}
-
 	var router *gin.Engine
 	if dev {
 		router = gin.Default()
+		router.Use(ginzap.Ginzap(logger, time.RFC3339, true))
+		router.Use(ginzap.RecoveryWithZap(logger, true))
 		pprof.Register(router)
 	} else {
 		gin.SetMode(gin.ReleaseMode)

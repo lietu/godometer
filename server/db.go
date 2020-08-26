@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
 	"time"
+
+	"go.uber.org/zap"
 
 	"cloud.google.com/go/firestore"
 	"github.com/lietu/godometer"
@@ -164,14 +165,14 @@ func (s *Server) readEvents(ctx context.Context) {
 	ref := eventsColl.Doc("lastEvents")
 	doc, err := ref.Get(ctx)
 	if err != nil {
-		log.Printf("Got error trying to load past events: %s", err)
+		logger.Warn("Got error trying to load past events", zap.Error(err))
 		return
 	}
 
 	eventContainer := LastEventContainer{}
 	err = doc.DataTo(&eventContainer)
 	if err != nil {
-		log.Printf("Got error trying to parse past events: %s", err)
+		logger.Warn("Got error trying to parse past events", zap.Error(err))
 		return
 	}
 
@@ -195,7 +196,7 @@ func (s *Server) readRecords(ctx context.Context, collection string, ids []strin
 
 	results, err := db.GetAll(ctx, refs)
 	if err != nil {
-		log.Printf("Error fetching records from DB: %s", err)
+		logger.Warn("Error fetching records from DB", zap.Error(err))
 	}
 
 	records := map[string]DBDataPoint{}
@@ -210,7 +211,7 @@ func (s *Server) readRecords(ctx context.Context, collection string, ids []strin
 		if r.Exists() {
 			err := r.DataTo(&row)
 			if err != nil {
-				log.Printf("Failed to read data from DB to record: %s. This is probably not great.", err)
+				logger.Warn("Failed to read data from DB to record. This is probably not great.", zap.Error(err))
 			}
 		}
 		records[r.Ref.ID] = row
@@ -428,7 +429,7 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 
 		ts, err := time.Parse(minuteLayout, udp.Timestamp)
 		if err != nil {
-			log.Printf("Failed to parse time from %s: %s", udp.Timestamp, err)
+			logger.Warn("Failed to parse time", zap.String("timestamp", udp.Timestamp), zap.Error(err))
 			continue
 		}
 
@@ -549,14 +550,14 @@ func (s *Server) writeStats(ctx context.Context, updateDataPoints []godometer.Up
 		keys = append(keys, days...)
 		keys = append(keys, hours...)
 		keys = append(keys, minutes...)
-		log.Printf("Processed events from %s", strings.Join(newEvents, ", "))
-		log.Printf("Saving %d records to DB: %s", batchRecords, strings.Join(keys, ", "))
+		logger.Info("Processed events", zap.Strings("events", newEvents))
+		logger.Info("Saving records to DB", zap.Int("count", batchRecords), zap.Strings("keys", keys))
 		_, err := batch.Commit(ctx)
 		if err != nil {
-			log.Printf("Error trying to save records to DB: %s", err)
+			logger.Warn("Error trying to save records to DB", zap.Error(err))
 		}
 	} else {
-		log.Printf("How strange, no records updated")
+		logger.Info("How strange, no records updated")
 	}
 
 	s.clearOldStats()
@@ -572,7 +573,7 @@ func GetClient(ctx context.Context, projectId string) *firestore.Client {
 	if firestoreClient == nil {
 		c, err := firestore.NewClient(ctx, projectId)
 		if err != nil {
-			log.Panicf("Failed to connect to DB: %s", err)
+			logger.Panic("Failed to connect to DB", zap.Error(err))
 		}
 
 		firestoreClient = c
