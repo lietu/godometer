@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"sort"
 	"time"
 
@@ -26,7 +27,7 @@ func collectionName(period string) string {
 }
 
 func recordStr(record DBDataPoint) string {
-	return fmt.Sprintf("%.2fm @ %.1fm/s or %.1fkm/h", record.Meters, record.MetersPerSecond, record.KilometersPerHour)
+	return fmt.Sprintf("%.2fm @ %.1fm/s or %.1fkm/h (%d records)", record.Meters, record.MetersPerSecond, record.KilometersPerHour, record.Counter)
 }
 
 func printRecords(records map[string]DBDataPoint) {
@@ -372,11 +373,17 @@ func calculateUpdate(old DBDataPoint, ok bool, newRow DBDataPoint) DBDataPoint {
 	result := newRow
 
 	if ok {
+		totalMPS := (old.MetersPerSecond * float32(old.Counter)) + newRow.MetersPerSecond
+		totalKPH := (old.KilometersPerHour * float32(old.Counter)) + newRow.KilometersPerHour
+
 		result = DBDataPoint{}
-		result.Counter = old.Counter + 1
+		// Only count updates with actual data in them
+		if newRow.Meters > 0 && newRow.MetersPerSecond > 0 && newRow.KilometersPerHour > 0 {
+			result.Counter = old.Counter + 1
+		}
 		result.Meters = old.Meters + newRow.Meters
-		result.MetersPerSecond += ((old.MetersPerSecond * float32(old.Counter)) + newRow.MetersPerSecond) / float32(result.Counter)
-		result.KilometersPerHour += ((old.KilometersPerHour * float32(old.Counter)) + newRow.KilometersPerHour) / float32(result.Counter)
+		result.MetersPerSecond = totalMPS / float32(result.Counter)
+		result.KilometersPerHour = totalKPH / float32(result.Counter)
 	}
 
 	return result
@@ -704,4 +711,68 @@ func Last4Years() [4]string {
 	}
 
 	return years
+}
+
+func fakeDataPoint() DBDataPoint {
+	metersChange := rand.Float64() * 50.0
+	if prevFakeMeters-metersChange > 0 && prevFakeMeters+metersChange < maxFakeMeters {
+		dir := rand.Int31n(1) == 1
+		if !dir {
+			metersChange = -metersChange
+		}
+	} else if prevFakeMeters+metersChange > maxFakeMeters {
+		metersChange = -metersChange
+	}
+
+	meters := prevFakeMeters + metersChange
+
+	mps := float32(meters / 60.0)
+	kph := mps * 3600.0 / 1000.0
+
+	prevFakeMeters = meters
+
+	return DBDataPoint{
+		Counter:           1,
+		Meters:            float32(meters),
+		MetersPerSecond:   mps,
+		KilometersPerHour: kph,
+	}
+}
+
+func (s *Server) fillFakeDataRecords(records map[string]DBDataPoint) {
+	for key := range records {
+		records[key] = fakeDataPoint()
+	}
+}
+
+func (s *Server) generateFakeData() {
+	// Initialize all data structures
+	s.fillFakeDataRecords(s.years)
+	s.fillFakeDataRecords(s.months)
+	s.fillFakeDataRecords(s.weeks)
+	s.fillFakeDataRecords(s.days)
+	s.fillFakeDataRecords(s.hours)
+	s.fillFakeDataRecords(s.minutes)
+
+	logger.Info("Filled records with fake data")
+
+	tick := time.Tick(time.Minute)
+	ctx := context.Background()
+	for {
+		select {
+		case <-tick:
+			dp := fakeDataPoint()
+			udp := []godometer.UpdateDataPoint{
+				{
+					Timestamp:         time.Now().In(utc).Format(minuteLayout),
+					Meters:            dp.Meters,
+					MetersPerSecond:   dp.MetersPerSecond,
+					KilometersPerHour: dp.KilometersPerHour,
+				},
+			}
+
+			logger.Info("FAKED EVENT", zap.Float32("meters", udp[0].Meters), zap.Float32("MPS", udp[0].MetersPerSecond), zap.Float32("KPH", udp[0].KilometersPerHour))
+			s.writeStats(ctx, udp)
+		}
+	}
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -217,70 +216,6 @@ func (s *Server) returnRecords(period string) gin.HandlerFunc {
 		}
 
 		c.JSON(200, response)
-	}
-}
-
-func fakeDataPoint() DBDataPoint {
-	metersChange := rand.Float64() * 50.0
-	if prevFakeMeters-metersChange > 0 && prevFakeMeters+metersChange < maxFakeMeters {
-		dir := rand.Int31n(1) == 1
-		if !dir {
-			metersChange = -metersChange
-		}
-	} else if prevFakeMeters+metersChange > maxFakeMeters {
-		metersChange = -metersChange
-	}
-
-	meters := prevFakeMeters + metersChange
-
-	mps := float32(meters / 60.0)
-	kph := mps * 3600.0 / 1000.0
-
-	prevFakeMeters = meters
-
-	return DBDataPoint{
-		Counter:           1,
-		Meters:            float32(meters),
-		MetersPerSecond:   mps,
-		KilometersPerHour: kph,
-	}
-}
-
-func (s *Server) fillFakeDataRecords(records map[string]DBDataPoint) {
-	for key := range records {
-		records[key] = fakeDataPoint()
-	}
-}
-
-func (s *Server) generateFakeData() {
-	// Initialize all data structures
-	s.fillFakeDataRecords(s.years)
-	s.fillFakeDataRecords(s.months)
-	s.fillFakeDataRecords(s.weeks)
-	s.fillFakeDataRecords(s.days)
-	s.fillFakeDataRecords(s.hours)
-	s.fillFakeDataRecords(s.minutes)
-
-	logger.Info("Filled records with fake data")
-
-	tick := time.Tick(time.Minute)
-	ctx := context.Background()
-	for {
-		select {
-		case <-tick:
-			dp := fakeDataPoint()
-			udp := []godometer.UpdateDataPoint{
-				{
-					Timestamp:         time.Now().In(utc).Format(minuteLayout),
-					Meters:            dp.Meters,
-					MetersPerSecond:   dp.MetersPerSecond,
-					KilometersPerHour: dp.KilometersPerHour,
-				},
-			}
-
-			logger.Info("FAKED EVENT", zap.Float32("meters", udp[0].Meters), zap.Float32("MPS", udp[0].MetersPerSecond), zap.Float32("KPH", udp[0].KilometersPerHour))
-			s.writeStats(ctx, udp)
-		}
 	}
 }
 
