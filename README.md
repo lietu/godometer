@@ -21,6 +21,7 @@ Tested on Raspberry Pi 4, should work on most Linux supported GPIO chips.
 [Licensed under the BSD 3-clause license](./LICENSE.md).
 
 [![Graphs by Godometer](godometer.png 'Godometer dashboard')](https://raw.githubusercontent.com/lietu/godometer/master/godometer.png)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Flietu%2Fgodometer.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Flietu%2Fgodometer?ref=badge_shield)
 
 ## Usage
 
@@ -407,3 +408,7 @@ yarn build
   to 0.0-1.0.
 - It would be nice if the `godometer` CLI command would offer a well rendered real time
   monitoring of the data instead of just logs.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Flietu%2Fgodometer.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Flietu%2Fgodometer?ref=badge_large)
